@@ -1,9 +1,9 @@
 import axios from "axios";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate ,Link} from "react-router-dom";
 
 const Login = () => {
-  const navigate=useNavigate();
+  const navigate = useNavigate();
   const [formData, setFromData] = useState({ email: "", password: "" });
 
   const [message, setMessage] = useState("");
@@ -26,7 +26,7 @@ const Login = () => {
       );
       setMessage(response.data.message);
       console.log(response.data);
-      navigate("/");
+      navigate("/home");
     } catch (error) {
       setMessage(error.response.data.message || "Registration failed");
     }
@@ -64,6 +64,15 @@ const Login = () => {
             Login
           </button>
         </form>
+        <p className="text-sm text-gray-600 text-center mt-4">
+          if have not registered?{" "}
+          <Link
+            to="/register"
+            className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+          >
+            Register
+          </Link>
+        </p>
 
         {message && (
           <p className="mt-4 text-center text-sm text-green-600">{message}</p>

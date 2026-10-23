@@ -1,9 +1,9 @@
 import { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 const Register = () => {
-  const navigate=useNavigate();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -28,16 +28,18 @@ const Register = () => {
         formData,
         {
           withCredentials: true,
-        }
+        },
       );
 
       setMessage(response.data.message);
       console.log(response.data);
-      navigate("/login");
+      navigate("/verify-otp", {
+        state: {
+          email: formData.email,
+        },
+      });
     } catch (error) {
-      setMessage(
-        error.response?.data?.message || "Registration failed"
-      );
+      setMessage(error.response?.data?.message || "Registration failed");
     }
   };
 
@@ -83,11 +85,17 @@ const Register = () => {
             Register
           </button>
         </form>
-
+        <p className="text-sm text-gray-600 text-center mt-4">
+          Already registered?{" "}
+          <Link
+            to="/login"
+            className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+          >
+            Login
+          </Link>
+        </p>
         {message && (
-          <p className="mt-4 text-center text-sm text-green-600">
-            {message}
-          </p>
+          <p className="mt-4 text-center text-sm text-green-600">{message}</p>
         )}
       </div>
     </div>

@@ -2,6 +2,8 @@ import User from "../models/user.models.js";
 import ApiResponse from "../utils/api-response.js";
 import ApiError from "../utils/api-error.js";
 import jwt from "jsonwebtoken";
+import { generateOTP } from "./OTP.js";
+import sendOTPEmail from "../utils/Email.js";
 
 const generateAccessAndRefreshToken = async (userId) => {
   try {
@@ -20,29 +22,37 @@ const generateAccessAndRefreshToken = async (userId) => {
 };
 
 const registerUser = async (req, res) => {
-  const { email, username, password, role } = req.body;
+  const { email, username, password } = req.body;
+  if (!email || !username || !password)
+    throw new ApiError(400, null, "Email,username,password is required");
   const existedUser = await User.findOne({ $or: [{ username }, { email }] });
   if (existedUser) {
     throw new ApiError(400, null, "username or email already exist", []);
   }
+
+  const otp = generateOTP();
+  console.log(otp);
+
   const user = new User({
     email,
     password,
     username,
     isEmailVerified: false,
+    emailVerificationOTP: otp,
+    emailVerificationOTPExpiry: new Date(Date.now() + 10 * 60 * 1000),
   });
-
-
 
   await user.save({ validateBeforeSave: false });
 
-  
   const createdUser = await User.findById(user._id).select(
     "-password -refreshToken -emailVerificationToken -emailVerificationExpiry",
   );
   if (!createdUser) {
     throw new ApiError(500, null, "internal server error", []);
   }
+
+  await sendOTPEmail(email, otp);
+
   return res
     .status(201)
     .json(
@@ -61,6 +71,10 @@ const login = async (req, res) => {
     throw new ApiError(400, null, "Email is required", []);
   }
 
+  if (!password) {
+    throw new ApiError(400, null, "Password is required", []);
+  }
+
   const user = await User.findOne({ email });
   if (!user) {
     throw new ApiError(400, null, "User does not exist", []);
@@ -70,6 +84,9 @@ const login = async (req, res) => {
   if (!isPasswordValid) {
     throw new ApiError(400, null, "Invalid credentials", []);
   }
+
+  if (!user.isEmailVerified)
+    throw new ApiError(403, null, "Please verify your email first");
 
   const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
     user._id,
@@ -121,7 +138,6 @@ const logoutUser = async (req, res) => {
     .json(new ApiResponse(200, {}, "user logout "));
 };
 
-
 const refreshAccessToken = async (req, res) => {
   const incomingRefreshToken = req.cookie.refreshToken || req.body.refreshToken;
   if (!incomingRefreshToken) {
@@ -166,4 +182,41 @@ const refreshAccessToken = async (req, res) => {
   }
 };
 
-export { registerUser, login, logoutUser, refreshAccessToken };
+const getProfile = async (req, res) => {
+  return res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "Profile fetched successfully"));
+};
+
+const updateProfile = async (req, res) => {
+  const { username, email } = req.body;
+
+  if (!username || !email)
+    throw new ApiError(400, null, "Nothing to update", []);
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) throw new ApiError(400, null, "User not found", []);
+
+  if (username) user.username = username;
+  if (email) user.email = email;
+
+  await user.save({ validateBeforeSave: false });
+
+  const updatedUser = await User.findById(user._id).select(
+    "-password -refreshToken -emailVerificationToken -emailVerificationExpiry",
+  );
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "Profile updated successfully"));
+};
+
+export {
+  registerUser,
+  login,
+  logoutUser,
+  refreshAccessToken,
+  getProfile,
+  updateProfile,
+};
